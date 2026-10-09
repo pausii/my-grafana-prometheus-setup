@@ -10,7 +10,7 @@
  ],
  "timezone": "browser",
  "schemaVersion": 39,
- "version": 10,
+ "version": 12,
  "refresh": "30s",
  "editable": true,
  "time": {
@@ -804,7 +804,7 @@
    },
    "description": "Shows why the labels are worth having. Because country, city, provider, role and runtime are stored as SEPARATE labels \u2014 rather than merged into one string like 'Germany/Falkenstein' \u2014 each can be filtered and grouped on. For example {provider=\"hetzner\"} or sum by (country) (...).",
    "gridPos": {
-    "h": 6,
+    "h": 9,
     "w": 24,
     "x": 0,
     "y": 34
@@ -820,7 +820,8 @@
      "legendFormat": "",
      "refId": "A",
      "instant": true,
-     "range": false
+     "range": false,
+     "format": "table"
     }
    ],
    "transformations": [

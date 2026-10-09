@@ -11,7 +11,7 @@
  ],
  "timezone": "browser",
  "schemaVersion": 39,
- "version": 9,
+ "version": 11,
  "refresh": "30s",
  "editable": true,
  "time": {
@@ -796,7 +796,7 @@
    },
    "description": "Labels are carried by the agent on the server itself at bootstrap, not written into the hub's config. A new server appears here without the hub being touched.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
    "gridPos": {
-    "h": 6,
+    "h": 9,
     "w": 24,
     "x": 0,
     "y": 48
@@ -812,7 +812,8 @@
      "legendFormat": "",
      "refId": "A",
      "instant": true,
-     "range": false
+     "range": false,
+     "format": "table"
     }
    ],
    "transformations": [

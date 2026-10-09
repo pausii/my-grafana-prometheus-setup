@@ -1,25 +1,56 @@
 # Screenshots
 
-Drop images here and they will render in the main README, which
-already references these filenames.
+Three are in place. The rest are listed below for when the
+situation that shows them comes round again.
 
-Suggested order — each one shows something the text claims, so a
-reader can check the claim instead of taking my word for it.
+## Present
 
-| File | What to capture | Where |
-|---|---|---|
-| `grafana-home.png` | The Fixed Servers dashboard, full page | Grafana home after login |
-| `grafana-ephemeral.png` | Ephemeral Servers dashboard with a few hosts pushing | Grafana → folder Ephemeral |
-| `grafana-netio.png` | The netIn/netOut totals and the per-5-minute bar chart | Ephemeral dashboard, lower half |
-| `prometheus-targets.png` | All targets UP | `http://localhost:9090/targets` |
-| `prometheus-alerts.png` | Alert rules loaded, all inactive | `http://localhost:9090/alerts` |
-| `promtool-test.png` | `SUCCESS` from the alert unit test | `docker exec prometheus promtool test rules /tmp/node_test.yml` |
-| `ufw-bypass.png` | A published container port answering from outside while UFW denies it | terminal, see "Docker punches through UFW" |
-| `quadlet-status.png` | `Loaded: ...container; generated` and the real process in the cgroup | `systemctl status node-exporter` on the Podman host |
-| `push-endpoint-test.png` | 401 / 403 / 404 / 400 responses from the push endpoint | terminal, see "The push endpoint" |
+| File | What it shows |
+|---|---|
+| `grafana-home.png` | The fixed-servers dashboard: four hosts up, CPU/memory/disk, trends, and the inventory table with every label as a column |
+| `prometheus-targets.png` | All four targets UP, with the full label set per target |
+| `prometheus-alerts.png` | Seven alert rules loaded across three groups, all inactive |
 
-Keep them reasonably sized — 1600px wide is plenty, and PNG
-compresses screenshots better than JPEG.
+## Still to capture
 
-Crop or blur anything that shows a real address, hostname or
-token. The whole point of this repo is that it carries none.
+Terminal output, so they need a manual screenshot — or just read
+them as the fenced blocks already in the main README.
+
+| File | Command |
+|---|---|
+| `promtool-test.png` | `docker exec prometheus promtool test rules /tmp/node_test.yml` |
+| `ufw-bypass.png` | `curl` against a published container port that UFW never allowed |
+| `quadlet-status.png` | `systemctl status node-exporter` on the Podman host |
+| `push-endpoint-test.png` | the 401 / 403 / 404 / 400 sequence against the push endpoint |
+
+Needs a live ephemeral host, so capture it next time one exists:
+
+| File | Where |
+|---|---|
+| `grafana-ephemeral.png` | Grafana → folder Ephemeral |
+| `grafana-netio.png` | same dashboard, the netIn/netOut and per-5-minute panels |
+
+## How the existing ones were made
+
+Headless Chrome through puppeteer-core, logging in and capturing
+the page. Two things that mattered:
+
+**Do not use `fullPage`, and do not scroll.** Grafana virtualises
+the dashboard — panels outside the viewport are removed from the
+DOM. `fullPage` captures empty boxes, and scrolling to force
+rendering unmounts the panels already drawn. Set a viewport tall
+enough for the whole dashboard instead, then take an ordinary
+viewport screenshot.
+
+**Wait for the queries, not for the clock.** A fixed delay catches
+Grafana mid-query and every panel renders blank. Wait until the
+"Cancel" button disappears.
+
+**IP addresses are masked in the DOM before the capture**, not
+blurred in the image afterwards: a tree walker finds text nodes
+matching an address pattern and wraps each match in a span with
+`filter: blur(5px)`. No OCR, and the blur lands exactly on the
+address rather than on a guessed rectangle.
+
+Crop or blur anything that still shows a real address before
+adding a new image here.

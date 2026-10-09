@@ -10,6 +10,8 @@ address has been replaced with a `<PLACEHOLDER>`.
 
 ![Grafana home](screenshots/grafana-home.png)
 
+> Screenshots are from my own running instance.
+
 ---
 
 ## What I started with
@@ -93,7 +95,6 @@ CGroup: /system.slice/node-exporter.service
         └─ /bin/node_exporter --path.rootfs=/host ...
 ```
 
-![Quadlet-generated unit](screenshots/quadlet-status.png)
 
 The word `generated` on the `Loaded:` line is systemd saying it
 invented this unit. And the cgroup holds the **actual**
@@ -147,7 +148,6 @@ hosts that beats sequential numbering: unique with no
 coordination, no race when several boot at once, and immediately
 usable to SSH in.
 
-![Ephemeral dashboard](screenshots/grafana-ephemeral.png)
 
 ## Adding a server
 
@@ -273,7 +273,6 @@ GET  with credentials      -> 403
 POST with credentials      -> 400   (reached Prometheus, empty body)
 ```
 
-![Push endpoint test](screenshots/push-endpoint-test.png)
 
 ## Alerts
 
@@ -298,7 +297,6 @@ docker exec prometheus promtool test rules /tmp/node_test.yml
   SUCCESS
 ```
 
-![promtool test](screenshots/promtool-test.png)
 
 It runs the rules against synthetic data — a host up for two
 minutes, then dead — and asserts the alert is **still pending** at
@@ -333,7 +331,6 @@ I did not read this somewhere — I found it on my own hub. A
 container answered HTTP 200 from the outside on a port UFW had
 never allowed:
 
-![UFW bypass](screenshots/ufw-bypass.png)
 
 Hence `network_mode: host` everywhere here. Two things come free
 with it: the scrape source address becomes predictable (the host's
@@ -398,7 +395,6 @@ per-5-minute panel pins `Min interval = 5m` and
 the query says `[5m]`, half the data silently vanishes — and the
 chart still looks entirely plausible.
 
-![Network totals](screenshots/grafana-netio.png)
 
 ## `label_values()` reads the index, not the data
 
