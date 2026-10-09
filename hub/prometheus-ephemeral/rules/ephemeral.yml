@@ -1,0 +1,52 @@
+# ============================================================
+# Alert rules for EPHEMERAL servers — deliberately looser
+# ============================================================
+# The important difference from the fixed-server rules:
+#
+# THERE IS NO ServerDown HERE.
+# Ephemeral servers exist to be destroyed. An alert every time you
+# delete a test VM only trains you to ignore alerts — and that
+# habit carries over to the alerts that matter.
+#
+# When a server stops pushing, its series simply go stale and
+# disappear. Nothing needs cleaning up.
+
+groups:
+  - name: ephemeral
+    rules:
+
+      - alert: EphemeralRunningTooLong
+        # This is the REAL problem with ephemeral servers: not that
+        # they die, but that they are forgotten and keep billing.
+        expr: >-
+          (node_time_seconds{environment="ephemeral"}
+           - node_boot_time_seconds{environment="ephemeral"}) > 24 * 3600
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $labels.server }} has been up for more than 24h"
+          description: >-
+            Ephemeral server in {{ $labels.city }} ({{ $labels.provider }})
+            has been running {{ $value | humanizeDuration }}. Still in
+            use, or forgotten?
+
+      - alert: EphemeralDiskFillingUp
+        expr: >-
+          100 - (node_filesystem_avail_bytes{environment="ephemeral",fstype!~"tmpfs|overlay|squashfs"}
+                 / node_filesystem_size_bytes{environment="ephemeral",fstype!~"tmpfs|overlay|squashfs"} * 100) > 85
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $labels.mountpoint }} on {{ $labels.server }} is {{ $value | printf \"%.0f\" }}% full"
+
+      - alert: EphemeralOomKill
+        expr: increase(node_vmstat_oom_kill{environment="ephemeral"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kernel OOM-killed a process on {{ $labels.server }}"
+          description: >-
+            {{ $value | printf "%.0f" }} time(s) in the last 10 minutes.

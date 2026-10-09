@@ -1,0 +1,103 @@
+# ============================================================
+# prometheus.yml — fixed servers (pull model)
+# ============================================================
+# Prometheus pulls: it fetches /metrics from each target over
+# HTTP. Nothing is pushed to it. That means only the targets need
+# an open inbound port, and only for this host's address.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'monitoring-hub'
+
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+scrape_configs:
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['127.0.0.1:9090']
+        labels:
+          server: 'de-fsn-01'
+
+  # --- The four fixed servers --------------------------------
+  #
+  # NAMING SCHEME
+  #   server    <country>-<dc>-<nn>   unique id, used in PromQL
+  #                                   and alerts
+  #   country   ISO 3166 two-letter code
+  #   city      datacenter city, following the provider's own term
+  #   provider  hetzner / ovh / ...
+  #   role      hub / node
+  #   runtime   docker / podman / systemd
+  #
+  # Why country and city are SEPARATE labels rather than one
+  # string like "Germany/Falkenstein": Prometheus is dimensional.
+  # With separate labels, `sum by (country)` and
+  # `{provider="hetzner"}` just work. Merged into one string, both
+  # are only reachable through brittle regexes.
+  #
+  # Start numbering at 01 even for the first server in a location.
+  # A second one always arrives eventually, and renaming a running
+  # server is far more painful than numbering from the start.
+  - job_name: 'node'
+    static_configs:
+
+      - targets: ['127.0.0.1:9100']
+        labels:
+          server: 'de-fsn-01'
+          country: 'de'
+          city: 'falkenstein'
+          provider: 'hetzner'
+          role: 'hub'
+          runtime: 'docker'
+
+      # Scraped over a private vSwitch rather than the public
+      # internet. node_exporter on that host binds ONLY to its
+      # private address, so port 9100 never exists on a public
+      # interface — even if the firewall rule disappears, there is
+      # nothing out there to reach. The firewall is the second
+      # layer, not the only one.
+      #
+      # Public-IPv6 alternative, if the private link is unavailable.
+      # Note the square brackets: an IPv6 address must be wrapped
+      # in [] because the colon is already the port separator.
+      #   - targets: ['[<NODE_B_IPV6>]:9100']
+      - targets: ['10.10.40.1:9100']
+        labels:
+          server: 'fi-hel-01'
+          country: 'fi'
+          city: 'helsinki'
+          provider: 'hetzner'
+          role: 'node'
+          runtime: 'docker'
+
+      - targets: ['<NODE_C_IPV4>:9100']
+        labels:
+          server: 'fr-gra-01'
+          country: 'fr'
+          city: 'gravelines'
+          provider: 'ovh'
+          role: 'node'
+          runtime: 'podman'
+
+      # node_exporter as a plain binary under systemd — no
+      # container runtime on this machine at all.
+      - targets: ['<NODE_D_IPV4>:9100']
+        labels:
+          server: 'de-fra-01'
+          country: 'de'
+          city: 'frankfurt'
+          provider: 'layer7'
+          role: 'node'
+          runtime: 'systemd'
+
+    # The default `instance` label is the target address, which is
+    # hard to read — especially for IPv6. Overwrite it with the
+    # server name so legends and dropdowns stay legible.
+    relabel_configs:
+      - source_labels: [server]
+        target_label: instance

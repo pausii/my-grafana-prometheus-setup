@@ -1,0 +1,29 @@
+# Grafana reads this on startup — no need to click
+# "Add data source" in the UI.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus            # fixed uid, referenced by the dashboard files
+    type: prometheus
+    access: proxy              # Grafana queries server-side, not your browser
+    # Every container uses network_mode: host, so Grafana and
+    # Prometheus share the same localhost.
+    url: http://127.0.0.1:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s        # match scrape_interval
+
+  # Second datasource — ephemeral servers only.
+  # The split in Grafana mirrors the split in storage:
+  # two Prometheus instances, two datasources, two dashboard folders.
+  - name: Prometheus Ephemeral
+    uid: prometheus-ephemeral
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9091
+    isDefault: false
+    editable: false
+    jsonData:
+      timeInterval: 15s

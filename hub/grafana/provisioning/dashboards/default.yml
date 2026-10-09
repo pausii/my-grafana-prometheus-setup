@@ -1,0 +1,27 @@
+# Tells Grafana to load every .json dashboard in these folders.
+apiVersion: 1
+
+providers:
+  - name: 'default'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
+
+  # Separate folder so ephemeral dashboards do not mix with the
+  # permanent infrastructure.
+  - name: 'ephemeral'
+    orgId: 1
+    folder: 'Ephemeral'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards-ephemeral
+      foldersFromFilesStructure: false

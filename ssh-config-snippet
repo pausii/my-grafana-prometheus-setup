@@ -1,0 +1,35 @@
+# ============================================================
+# Add to ~/.ssh/config on your workstation
+# ============================================================
+# node-b has no public IPv4. If your ISP has not given you IPv6
+# either, you cannot reach it directly — so the hub acts as a
+# bastion. It has IPv4 (for you) and IPv6 (for node-b), bridging
+# the two.
+
+Host hub
+    HostName <HUB_IPV4>
+    User root
+    # Tunnels for Grafana and Prometheus. Just run "ssh hub",
+    # then open http://localhost:3000 in your browser.
+    LocalForward 3000 127.0.0.1:3000
+    LocalForward 9090 127.0.0.1:9090
+    LocalForward 9091 127.0.0.1:9091
+
+Host node-b
+    HostName <NODE_B_IPV6>
+    User root
+    # Jump via the hub. The connection to node-b originates from
+    # the hub's IPv6 address — exactly the one allowed in its
+    # firewall, so no extra rule is needed.
+    ProxyJump hub
+
+Host node-c
+    HostName <NODE_C_IPV4>
+    User youruser
+
+Host node-d
+    HostName <NODE_D_IPV4>
+    User root
+
+# Note: a "Host *" block, if you have one, belongs at the END of
+# the file.

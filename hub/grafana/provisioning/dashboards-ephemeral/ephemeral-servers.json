@@ -1,0 +1,862 @@
+{
+ "id": null,
+ "uid": "ephemeral-servers",
+ "title": "Ephemeral Servers",
+ "description": "Short-lived servers across providers that push their own metrics via remote_write. Fully separated from the fixed infrastructure.",
+ "tags": [
+  "infrastructure",
+  "node-exporter",
+  "ephemeral",
+  "push"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "version": 9,
+ "refresh": "30s",
+ "editable": true,
+ "time": {
+  "from": "now-3h",
+  "to": "now"
+ },
+ "templating": {
+  "list": [
+   {
+    "name": "node",
+    "label": "Server",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "prometheus-ephemeral"
+    },
+    "definition": "query_result(up{job=\"node-ephemeral\"} == 1)",
+    "query": {
+     "qryType": 3,
+     "query": "query_result(up{job=\"node-ephemeral\"} == 1)",
+     "refId": "A"
+    },
+    "regex": "/server=\"([^\"]+)\"/",
+    "description": "Only servers currently pushing. Uses query_result rather than label_values: label_values reads the index, and the index still holds the names of series that were deleted until the block is compacted. query_result runs a real query.",
+    "refresh": 2,
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "selected": true,
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
+    },
+    "sort": 1
+   }
+  ]
+ },
+ "panels": [
+  {
+   "type": "stat",
+   "title": "Ephemeral servers up",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "description": "If this is 0, no ephemeral servers are running \u2014 which is the normal state, not a problem.",
+   "gridPos": {
+    "h": 5,
+    "w": 5,
+    "x": 0,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "count(up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "up",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "text"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "none",
+    "graphMode": "none",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "stat",
+   "title": "Age \u2014 forgotten?",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "description": "The most important panel here. The problem with ephemeral servers is not that they die, it is that they are forgotten and keep billing.\n\nGreen under 24h, orange over 24h, red over 72h.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "gridPos": {
+    "h": 5,
+    "w": 19,
+    "x": 5,
+    "y": 0
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "(node_time_seconds{job=\"node-ephemeral\",server=~\"$node\"} - node_boot_time_seconds{job=\"node-ephemeral\",server=~\"$node\"}) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 86400
+       },
+       {
+        "color": "red",
+        "value": 259200
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "textMode": "value_and_name",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "bargauge",
+   "title": "CPU",
+   "description": "Instant value, not a graph.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 0,
+    "y": 5
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "100 - (avg without(cpu, mode) (rate(node_cpu_seconds_total{job=\"node-ephemeral\",server=~\"$node\",mode=\"idle\"}[5m])) * 100) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 85
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "displayMode": "gradient",
+    "orientation": "horizontal",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "bargauge",
+   "title": "Memory",
+   "description": "Uses MemAvailable, not MemFree. On Linux MemFree is misleading: it counts reclaimable page cache as used.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 8,
+    "y": 5
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node-ephemeral\",server=~\"$node\"} / node_memory_MemTotal_bytes{job=\"node-ephemeral\",server=~\"$node\"}) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 70
+       },
+       {
+        "color": "red",
+        "value": 85
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "displayMode": "gradient",
+    "orientation": "horizontal",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "bargauge",
+   "title": "Disk /",
+   "description": "Root partition only.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 8,
+    "x": 16,
+    "y": 5
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "100 - (node_filesystem_avail_bytes{job=\"node-ephemeral\",server=~\"$node\",mountpoint=\"/\"} / node_filesystem_size_bytes{job=\"node-ephemeral\",server=~\"$node\",mountpoint=\"/\"} * 100) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 75
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "displayMode": "gradient",
+    "orientation": "horizontal",
+    "showUnfilled": true,
+    "valueMode": "color",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "stat",
+   "title": "Total in (netIn)",
+   "description": "Bytes that actually flowed during the SELECTED TIME RANGE in the top right \u2014 change the range and this number changes with it.\n\nUses increase() rather than a plain difference, because node_network_*_bytes_total is a counter that resets to zero on every reboot or interface reset. increase() recognises the reset instead of reading it as a huge negative spike.\n\nlo and docker0 are excluded: the first is traffic to itself, the second is inter-container traffic that never leaves the machine.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 0,
+    "y": 11
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "sum by (server, city, provider) (increase(node_network_receive_bytes_total{job=\"node-ephemeral\",server=~\"$node\",device!~\"lo|docker.*|veth.*|br-.*|podman.*|cni.*|tun.*\"}[$__range])) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "decbytes",
+     "decimals": 2,
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "green"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "textMode": "value_and_name",
+    "justifyMode": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "stat",
+   "title": "Total out (netOut)",
+   "description": "Bytes that actually flowed during the SELECTED TIME RANGE in the top right \u2014 change the range and this number changes with it.\n\nUses increase() rather than a plain difference, because node_network_*_bytes_total is a counter that resets to zero on every reboot or interface reset. increase() recognises the reset instead of reading it as a huge negative spike.\n\nlo and docker0 are excluded: the first is traffic to itself, the second is inter-container traffic that never leaves the machine.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 12,
+    "y": 11
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "sum by (server, city, provider) (increase(node_network_transmit_bytes_total{job=\"node-ephemeral\",server=~\"$node\",device!~\"lo|docker.*|veth.*|br-.*|podman.*|cni.*|tun.*\"}[$__range])) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "decbytes",
+     "decimals": 2,
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "blue"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "value",
+    "graphMode": "area",
+    "textMode": "value_and_name",
+    "justifyMode": "auto",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "CPU used (%)",
+   "description": "rate() gives the per-second increase of the idle CPU counter; subtracting from 100 yields percent used.\n\nNote `avg without(cpu, mode)` rather than `avg by(instance)`. Both average across cores, but by(instance) DROPS every other label, leaving the {{city}} legend empty. without() removes only the two labels named and keeps the rest.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 17
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "100 - (avg without(cpu, mode) (rate(node_cpu_seconds_total{job=\"node-ephemeral\",server=~\"$node\",mode=\"idle\"}[5m])) * 100) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": true
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Memory used (%)",
+   "description": "See the \"Memory now\" panel for why this uses MemAvailable.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 17
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node-ephemeral\",server=~\"$node\"} / node_memory_MemTotal_bytes{job=\"node-ephemeral\",server=~\"$node\"}) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": true
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Network throughput",
+   "description": "Instantaneous rate, not a total. Outbound is drawn negative so both directions are readable in one graph without hiding each other.\n\nMultiplied by 8 to convert bytes/s into bits/s \u2014 the unit providers quote for link capacity.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 25
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "sum by (server, city, provider) (rate(node_network_receive_bytes_total{job=\"node-ephemeral\",server=~\"$node\",device!~\"lo|docker.*|veth.*|br-.*|podman.*|cni.*|tun.*\"}[5m])) * 8 and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}}) in",
+     "refId": "A",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "-sum by (server, city, provider) (rate(node_network_transmit_bytes_total{job=\"node-ephemeral\",server=~\"$node\",device!~\"lo|docker.*|veth.*|br-.*|podman.*|cni.*|tun.*\"}[5m])) * 8 and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}}) out",
+     "refId": "B",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bps",
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 15,
+      "showPoints": "never",
+      "spanNulls": true,
+      "axisCenteredZero": true
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Volume per 5 minutes",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "description": "How many bytes flowed WITHIN each 5-minute window \u2014 not a rate, not cumulative. Each bar stands alone.\n\nDifference from \"Network throughput\" above: throughput answers \"how fast right now\" (bits/s), this answers \"how much during that period\" (bytes). For estimating transfer quota usage, this is the relevant one.\n\nFor the buckets to neither overlap nor leave gaps, the range inside increase() must match the query step. Hence Min interval = 5m and Max data points = 3000 \u2014 enough to span a full 7 days without forcing Grafana to widen the step.\n\nOutbound is drawn negative.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 33
+   },
+   "interval": "5m",
+   "maxDataPoints": 3000,
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "sum by (server, city, provider) (increase(node_network_receive_bytes_total{job=\"node-ephemeral\",server=~\"$node\",device!~\"lo|docker.*|veth.*|br-.*|podman.*|cni.*|tun.*\"}[5m])) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}}) in",
+     "range": true,
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "-sum by (server, city, provider) (increase(node_network_transmit_bytes_total{job=\"node-ephemeral\",server=~\"$node\",device!~\"lo|docker.*|veth.*|br-.*|podman.*|cni.*|tun.*\"}[5m])) and on(server) (up{job=\"node-ephemeral\"} == 1)",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}}) out",
+     "range": true,
+     "refId": "B"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "decbytes",
+     "decimals": 1,
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 70,
+      "lineWidth": 0,
+      "barAlignment": 0,
+      "axisCenteredZero": true,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "none"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "max",
+      "mean",
+      "sum"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Push pipeline health",
+   "description": "The ONLY panel here not filtered to active servers \u2014 deliberately. This is exactly where you want to see a server that STOPPED: the broken line marks when it quit pushing.\n\nThe `up` metric here is not generated by the hub. The hub pulls nothing from ephemeral servers, it only receives. This value is produced by the agent on the server itself and pushed along with everything else.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "gridPos": {
+    "h": 7,
+    "w": 24,
+    "x": 0,
+    "y": 41
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "up{job=\"node-ephemeral\",server=~\"$node\"}",
+     "legendFormat": "{{server}} \u2014 {{city}} ({{provider}})",
+     "refId": "A",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "color": {
+      "mode": "palette-classic"
+     },
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": true
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "table",
+   "title": "Ephemeral server inventory",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus-ephemeral"
+   },
+   "description": "Labels are carried by the agent on the server itself at bootstrap, not written into the hub's config. A new server appears here without the hub being touched.\n\nShows only servers that are CURRENTLY pushing. The `and on(server) (up == 1)` filter is needed because the \"All\" option on the $node variable becomes \".*\", which also matches servers that have already been shut down.",
+   "gridPos": {
+    "h": 6,
+    "w": 24,
+    "x": 0,
+    "y": 48
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus-ephemeral"
+     },
+     "editorMode": "code",
+     "expr": "up{job=\"node-ephemeral\",server=~\"$node\"} == 1",
+     "legendFormat": "",
+     "refId": "A",
+     "instant": true,
+     "range": false
+    }
+   ],
+   "transformations": [
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "job": true,
+       "__name__": true,
+       "Value": true,
+       "monitor": true,
+       "environment": true
+      },
+      "indexByName": {
+       "server": 0,
+       "country": 1,
+       "city": 2,
+       "provider": 3,
+       "runtime": 4
+      },
+      "renameByName": {
+       "server": "Server",
+       "country": "Country",
+       "city": "City",
+       "provider": "Provider",
+       "runtime": "Runtime",
+       "instance": "Instance"
+      }
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "align": "left",
+      "filterable": true
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "showHeader": true
+   }
+  }
+ ]
+}

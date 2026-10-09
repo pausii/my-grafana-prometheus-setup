@@ -1,0 +1,34 @@
+# ============================================================
+# .gitignore
+# ============================================================
+# This repository is a set of notes — every address in it is a
+# placeholder. Once you fill them in with real values, those
+# files must not be committed back to a public repository.
+
+# Your own infrastructure map. Copy from inventory.env.example
+# and fill it in; the result never gets committed.
+inventory.env
+
+# Secrets that must never be committed.
+secrets/
+**/.env
+**/.env.local
+
+# Basic-auth hashes for the push endpoint.
+*.htpasswd
+
+# Keys and certificates.
+*.key
+*.pem
+id_rsa*
+id_ed25519*
+
+# Community dashboard, downloaded by fetch-dashboards.sh
+node-exporter-full.json
+
+# Noise
+*.bak
+*.bak.*
+*.swp
+*~
+.DS_Store

@@ -1,0 +1,70 @@
+# ============================================================
+# /etc/systemd/system/node_exporter.service
+# ============================================================
+# The third way, after Docker and Podman: no container at all.
+# One static binary, one systemd unit, one unprivileged user.
+#
+# For an exporter this is the simplest honest shape. There is no
+# container daemon that must start first, no virtual network
+# layer, no /host bind mount. node_exporter reads /proc and /sys
+# directly — which is where they live anyway.
+
+[Unit]
+Description=Prometheus node_exporter
+Documentation=https://github.com/prometheus/node_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Dedicated system user, no shell, no home. If node_exporter ever
+# has a vulnerability, the attacker lands as a user who can do
+# nothing.
+User=node_exporter
+Group=node_exporter
+
+# LISTEN_ADDR comes from /etc/default/node_exporter, written by
+# install.sh from .env. The Environment= line below provides the
+# default; EnvironmentFile= overrides it when present. The "-"
+# prefix means a missing file is not an error.
+Environment=LISTEN_ADDR=:9100
+EnvironmentFile=-/etc/default/node_exporter
+
+ExecStart=/usr/local/bin/node_exporter \
+  --web.listen-address=${LISTEN_ADDR} \
+  --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containers/.+)($|/) \
+  --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|securityfs|selinuxfs|squashfs|sysfs|tracefs)$ \
+  --collector.systemd \
+  --collector.systemd.unit-include=^(ssh|sshd|cron|systemd-timesyncd|unattended-upgrades|ufw|nginx|docker|podman).*\.service$
+
+# --collector.systemd exposes systemd unit state, so a FAILED
+# service becomes a metric. This found a service that had been
+# dead for an unknown length of time on the first host it ran on.
+# In a container this is awkward (it needs host D-Bus access);
+# here it is one flag.
+# unit-include narrows it to units worth watching — without it,
+# hundreds of system units are reported for no benefit.
+
+Restart=always
+RestartSec=5
+
+# --- systemd hardening ---------------------------------------
+# node_exporter only ever needs to READ. Everything below makes
+# the process unable to write anywhere or gain privileges. This
+# is what replaces the isolation a container namespace provides.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# AF_UNIX is needed to talk to systemd over D-Bus.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

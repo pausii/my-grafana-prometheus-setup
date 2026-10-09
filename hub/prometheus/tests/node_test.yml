@@ -1,0 +1,50 @@
+# ============================================================
+# Unit tests for the alert rules
+#   docker exec prometheus promtool test rules /tmp/node_test.yml
+# ============================================================
+# Runs the rules against SYNTHETIC data. The point: prove that
+# `for: 2m` really does hold the alert back for two minutes,
+# without having to kill a real server to find out.
+#
+# It doubles as a safety net when changing the label scheme — if
+# labels change and the annotations are not updated to match, this
+# test fails immediately.
+
+rule_files:
+  - /etc/prometheus/rules/node.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      # Up for two minutes, then dead.
+      # Values at: minute-0  minute-1  minute-2 ...
+      - series: 'up{job="node",instance="fi-hel-01",server="fi-hel-01",country="fi",city="helsinki",provider="hetzner",role="node",runtime="docker"}'
+        values: '1 1 0 0 0 0 0'
+
+    alert_rule_test:
+      # Minute 3: down for only 1 minute -> still PENDING.
+      # This is what stops a brief network hiccup from paging you.
+      - eval_time: 3m
+        alertname: ServerDown
+        exp_alerts: []
+
+      # Minute 4: down for 2 minutes -> FIRING.
+      - eval_time: 4m
+        alertname: ServerDown
+        exp_alerts:
+          - exp_labels:
+              alertname: ServerDown
+              job: node
+              instance: fi-hel-01
+              server: fi-hel-01
+              country: fi
+              city: helsinki
+              provider: hetzner
+              role: node
+              runtime: docker
+              severity: critical
+            exp_annotations:
+              summary: "fi-hel-01 is not responding"
+              description: "Prometheus has failed to scrape fi-hel-01 (helsinki, hetzner, docker) for more than 2 minutes. Check the host, the network, and the firewall rules."

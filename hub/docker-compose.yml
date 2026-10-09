@@ -1,0 +1,155 @@
+# ============================================================
+# HUB — Prometheus + Grafana + node_exporter
+#   docker compose up -d
+# ============================================================
+#
+# DESIGN NOTE: every service uses network_mode: host.
+# Three reasons, all of them load-bearing:
+#
+#  1. UFW ACTUALLY APPLIES. Ports published with "ports:" are
+#     written by Docker into the iptables DOCKER chain, which is
+#     evaluated BEFORE UFW. You think you denied the port; it is
+#     open to the internet. Host networking uses no Docker NAT at
+#     all. This was verified on a live host: a container answered
+#     HTTP 200 from outside on a port UFW never allowed.
+#
+#  2. IPv6 WORKS. Docker's default bridge has no IPv6. A node that
+#     only has an IPv6 address is unreachable from inside a bridge.
+#
+#  3. NETWORK METRICS ARE CORRECT. node_exporter reads the host's
+#     real interfaces, not a fake one belonging to the container.
+#
+# Consequence: there is no inter-container DNS, so services address
+# each other over 127.0.0.1. That is why the Grafana datasource
+# points at http://127.0.0.1:9090.
+
+services:
+
+  # ----------------------------------------------------------
+  # 1) node_exporter — this machine's own metrics
+  # ----------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containers/.+)($$|/)'
+      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$'
+      # Localhost only: Prometheus runs on this same machine, so
+      # nothing needs to reach this from outside.
+      - '--web.listen-address=127.0.0.1:9100'
+
+  # ----------------------------------------------------------
+  # 2) Prometheus — fixed servers, pull model
+  # ----------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: prometheus
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'          # reload config without restarting
+      # Localhost only. Prometheus has NO authentication whatsoever
+      # — anyone who can open :9090 can read every metric of your
+      # infrastructure. Reach it through an SSH tunnel.
+      - '--web.listen-address=127.0.0.1:9090'
+
+  # ----------------------------------------------------------
+  # 3) Grafana
+  # ----------------------------------------------------------
+  grafana:
+    image: grafana/grafana:13.1.4
+    container_name: grafana
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD in .env}
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+      # Still listens on localhost only. What faces the internet is
+      # the reverse proxy, not Grafana.
+      - GF_SERVER_HTTP_ADDR=127.0.0.1
+      - GF_SERVER_HTTP_PORT=3000
+
+      # --- Home page ------------------------------------------
+      # Without this, Grafana's home is the stock page full of
+      # tutorial links. Set declaratively rather than through the
+      # UI: a UI preference lives in Grafana's database and
+      # disappears when the volume is recreated.
+      # This path is INSIDE the container.
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/fixed-servers.json
+
+      # --- Required when behind a reverse proxy ---------------
+      # Without root_url, Grafana believes it lives at
+      # localhost:3000; password-reset links and some redirects
+      # then point to the wrong place.
+      - GF_SERVER_ROOT_URL=https://grafana.example.com
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=lax
+      # HSTS differs from a 301 redirect: the browser REFUSES the
+      # http version before sending anything, rather than sending
+      # it and being redirected.
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS=31536000
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
+  # ----------------------------------------------------------
+  # 4) Second Prometheus — receives pushes from ephemeral servers
+  # ----------------------------------------------------------
+  # Separated from the main instance on purpose. Its write endpoint
+  # faces the internet, and Prometheus CANNOT re-filter labels
+  # arriving over remote_write — whoever holds the push credential
+  # can inject any metric with any label. With a separate instance,
+  # a leaked credential only pollutes ephemeral data; the fixed
+  # infrastructure's history is untouched.
+  prometheus-ephemeral:
+    image: prom/prometheus:v3.14.0
+    container_name: prometheus-ephemeral
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./prometheus-ephemeral/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-ephemeral/rules:/etc/prometheus/rules:ro
+      - prometheus-ephemeral-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      # Short retention: ephemeral servers need no long history,
+      # and each new one creates a fresh set of series.
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+      # THIS is the key flag — it opens /api/v1/write as a receiver.
+      - '--web.enable-remote-write-receiver'
+      # Enables /api/v1/admin/tsdb/delete_series, used to clear out
+      # orphaned series left behind when an ephemeral server's
+      # labels change. That need recurs here, so it stays on.
+      # The MAIN Prometheus deliberately does NOT get this flag:
+      # a data-deletion endpoint is the last thing you want
+      # available without a reason.
+      - '--web.enable-admin-api'
+      - '--web.listen-address=127.0.0.1:9091'
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  prometheus-ephemeral-data:

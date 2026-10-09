@@ -1,0 +1,66 @@
+# ============================================================
+# Quadlet unit — ROOTFUL Podman
+# Install to: /etc/containers/systemd/node-exporter.container
+# ============================================================
+#
+# This is NOT an ordinary systemd unit, and you never write one.
+# Quadlet is a generator: on "systemctl daemon-reload", systemd
+# reads this file and GENERATES a full .service unit from it.
+#
+# That is the fundamental difference from Docker here:
+#   Docker  a dockerd daemon supervises containers; systemd only
+#           knows about "dockerd". Restart policy lives in
+#           docker-compose.yml.
+#   Podman  no daemon. The container is a direct child of systemd,
+#           exactly like any other service on the machine.
+#
+# In practice: "journalctl -u node-exporter" contains
+# node_exporter's own log, and "systemctl status" shows the real
+# container process rather than a daemon.
+#
+# Rootless is the better choice when available — put the file in
+# ~/.config/containers/systemd/ and use WantedBy=default.target.
+# It requires a non-root user with subuid/subgid allocations.
+
+[Unit]
+Description=Prometheus node_exporter
+Documentation=https://github.com/prometheus/node_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/prom/node-exporter:v1.12.1
+ContainerName=node-exporter
+
+# Host network: real host interfaces in the metrics, and port 9100
+# subject to UFW.
+Network=host
+
+# NOTE: unlike the Docker node, the listen address is fixed at
+# :9100 here rather than coming from a .env. Quadlet does not
+# expand shell variables inside Exec=, so there is no clean way to
+# parameterise it. On this kind of host UFW is the only guard
+# anyway, which is why its rule is installed BEFORE the exporter
+# starts.
+
+# See every host process. Useful for a few collectors.
+PodmanArgs=--pid=host
+
+# Whole host filesystem, read-only.
+Volume=/:/host:ro,rslave
+
+# Arguments for node_exporter itself. Note that "$" is written
+# literally here — unlike docker-compose.yml, there is no variable
+# interpolation to escape.
+Exec=--path.rootfs=/host --web.listen-address=:9100 --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containers/.+)($|/) --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|securityfs|selinuxfs|squashfs|sysfs|tracefs)$
+
+[Service]
+Restart=always
+RestartSec=10
+# Room to pull the image on first start.
+TimeoutStartSec=300
+
+[Install]
+# multi-user.target for rootful (starts at boot, no login needed).
+# Rootless uses default.target instead.
+WantedBy=multi-user.target
