@@ -7,7 +7,7 @@ situation that shows them comes round again.
 
 | File | What it shows |
 |---|---|
-| `grafana-home.png` | The fixed-servers dashboard: four hosts up, CPU/memory/disk, trends, and the inventory table with every label as a column |
+| `grafana-home.png` | The fixed-servers dashboard: four hosts up, CPU/memory/disk, trends, and the inventory table. The cores/RAM/disk values are blurred; the column headers are left readable so the shape of the table is still clear |
 | `prometheus-targets.png` | All four targets UP, with the full label set per target |
 | `prometheus-alerts.png` | Seven alert rules loaded across three groups, all inactive |
 
@@ -45,6 +45,11 @@ viewport screenshot.
 **Wait for the queries, not for the clock.** A fixed delay catches
 Grafana mid-query and every panel renders blank. Wait until the
 "Cancel" button disappears.
+
+Column values are blurred the same way, found by locating the
+column index from `[role=columnheader]` and applying the blur to
+`[role=gridcell]` at that index — position in the data, not a
+guessed rectangle in the image. Headers stay readable on purpose.
 
 **IP addresses are masked in the DOM before the capture**, not
 blurred in the image afterwards: a tree walker finds text nodes

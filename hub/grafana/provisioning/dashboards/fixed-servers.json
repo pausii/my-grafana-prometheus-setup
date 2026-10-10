@@ -10,7 +10,7 @@
  ],
  "timezone": "browser",
  "schemaVersion": 39,
- "version": 12,
+ "version": 13,
  "refresh": "30s",
  "editable": true,
  "time": {
@@ -798,11 +798,11 @@
   {
    "type": "table",
    "title": "Server inventory",
+   "description": "Static facts, which is why they live in a table rather than their own panels \u2014 a time-series dashboard is for what changes.\n\nCores/RAM/Disk matter because a percentage without scale misleads: 55% of a 12 GB box leaves 5.5 GB, while 4% of a 67 GB box leaves 64 GB. The same alert threshold means very different things.\n\nFour queries joined with joinByField on the server column. B/C/D aggregate by (server) so other labels are dropped and the join does not produce duplicate columns.",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
    },
-   "description": "Shows why the labels are worth having. Because country, city, provider, role and runtime are stored as SEPARATE labels \u2014 rather than merged into one string like 'Germany/Falkenstein' \u2014 each can be filtered and grouped on. For example {provider=\"hetzner\"} or sum by (country) (...).",
    "gridPos": {
     "h": 9,
     "w": 24,
@@ -817,40 +817,97 @@
      },
      "editorMode": "code",
      "expr": "up{job=\"node\"}",
-     "legendFormat": "",
-     "refId": "A",
+     "format": "table",
      "instant": true,
      "range": false,
-     "format": "table"
+     "legendFormat": "",
+     "refId": "A"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "editorMode": "code",
+     "expr": "count by (server) (node_cpu_seconds_total{job=\"node\",mode=\"idle\"})",
+     "format": "table",
+     "instant": true,
+     "range": false,
+     "legendFormat": "",
+     "refId": "B"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "editorMode": "code",
+     "expr": "max by (server) (node_memory_MemTotal_bytes{job=\"node\"})",
+     "format": "table",
+     "instant": true,
+     "range": false,
+     "legendFormat": "",
+     "refId": "C"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "editorMode": "code",
+     "expr": "max by (server) (node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\"})",
+     "format": "table",
+     "instant": true,
+     "range": false,
+     "legendFormat": "",
+     "refId": "D"
     }
    ],
    "transformations": [
+    {
+     "id": "joinByField",
+     "options": {
+      "byField": "server",
+      "mode": "outer"
+     }
+    },
     {
      "id": "organize",
      "options": {
       "excludeByName": {
        "Time": true,
-       "job": true,
+       "Time 1": true,
+       "Time 2": true,
+       "Time 3": true,
+       "Time 4": true,
        "__name__": true,
-       "Value": true
+       "job": true,
+       "instance": true,
+       "peran": true,
+       "role": true,
+       "Value #A": true,
+       "environment": true,
+       "monitor": true
       },
       "indexByName": {
        "server": 0,
        "country": 1,
        "city": 2,
        "provider": 3,
-       "role": 4,
-       "runtime": 5,
-       "instance": 6
+       "Value #B": 4,
+       "Value #C": 5,
+       "Value #D": 6,
+       "runtime": 7
       },
       "renameByName": {
        "server": "Server",
        "country": "Country",
        "city": "City",
        "provider": "Provider",
-       "role": "Role",
-       "runtime": "Runtime",
-       "instance": "Instance"
+       "Value #B": "Cores",
+       "Value #C": "RAM",
+       "Value #D": "Disk",
+       "runtime": "Runtime"
       }
      }
     }
@@ -862,7 +919,80 @@
       "filterable": true
      }
     },
-    "overrides": []
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Cores"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "short"
+       },
+       {
+        "id": "decimals",
+        "value": 0
+       },
+       {
+        "id": "custom.align",
+        "value": "right"
+       },
+       {
+        "id": "custom.width",
+        "value": 80
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "RAM"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "decbytes"
+       },
+       {
+        "id": "decimals",
+        "value": 1
+       },
+       {
+        "id": "custom.align",
+        "value": "right"
+       },
+       {
+        "id": "custom.width",
+        "value": 100
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "Disk"
+      },
+      "properties": [
+       {
+        "id": "unit",
+        "value": "decbytes"
+       },
+       {
+        "id": "decimals",
+        "value": 0
+       },
+       {
+        "id": "custom.align",
+        "value": "right"
+       },
+       {
+        "id": "custom.width",
+        "value": 100
+       }
+      ]
+     }
+    ]
    },
    "options": {
     "showHeader": true
