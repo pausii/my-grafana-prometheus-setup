@@ -63,7 +63,14 @@ RestrictSUIDSGID=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
 # AF_UNIX is needed to talk to systemd over D-Bus.
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK is mandatory. Modern node_exporter reads network
+# statistics over netlink, not /proc/net/dev - without this
+# address family the netdev, arp, conntrack, bonding and ipvs
+# collectors all fail with "address family not supported by
+# protocol". The failure is silent: node_exporter stays up and
+# keeps exporting hundreds of other metrics, only the network
+# ones are never there.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 SystemCallArchitectures=native
 
 [Install]
