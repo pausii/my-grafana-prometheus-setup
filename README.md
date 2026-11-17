@@ -25,7 +25,7 @@ Four servers that had nothing in common:
 | node-c | OVH | Gravelines | Podman, and the only account had UID 0 |
 | node-d | Layer7 | Frankfurt | completely bare, no container runtime |
 
-Plus a handful of short-lived VMs at UpCloud and Linode that get
+Plus a handful of short-lived VMs at DigitalOcean and Linode that get
 created and destroyed, which I also wanted to see.
 
 I wanted one place to look at all of them. Nothing more ambitious
@@ -116,7 +116,8 @@ with no shell.
 What replaces container isolation is systemd hardening —
 `ProtectSystem=strict`, `NoNewPrivileges`,
 `MemoryDenyWriteExecute`, and friends. node_exporter only ever
-needs to read.
+needs to read. One of those flags later cost me every network
+metric on the host — [below](#systemd-hardening-silently-removed-the-network-metrics).
 
 What the other three cannot easily have:
 
@@ -147,6 +148,14 @@ The server names itself after its public IP. For short-lived
 hosts that beats sequential numbering: unique with no
 coordination, no race when several boot at once, and immediately
 usable to SSH in.
+
+![Ephemeral dashboard](screenshots/grafana-ephemeral.png)
+
+Four rented workers, between a day and three days old. The age
+panel is the one that earns its place: nothing stops a host that
+was meant to live for an afternoon from still being billed a week
+later, so the dashboard asks the question instead of me
+remembering to.
 
 
 ## Adding a server
@@ -416,6 +425,43 @@ A config holding a token should be mode 600 — but the
 Mode 600 owned by root means the container restart-loops with
 `permission denied`. Keep 600, change the owner to 65534.
 
+## systemd hardening silently removed the network metrics
+
+The hardening on the unit included:
+
+```
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+```
+
+Modern node_exporter reads interface counters over **netlink**,
+not `/proc/net/dev`. `AF_NETLINK` is not in that list, so the
+kernel refused the socket:
+
+```
+netdev  err="couldn't get netstats: socket: address family not supported by protocol"
+```
+
+What made it expensive is that nothing looked wrong. The process
+stayed up, `systemctl status` stayed green, the other 425 metrics
+kept being exported. Only the network ones were never there — and
+a line missing from a graph does not draw attention the way a
+broken one does.
+
+I had copied that same line into the container-free variant of
+the push agent, so hosts installed either way were affected. Checking the history
+afterwards: one of the fixed servers had never recorded a single
+network sample in its life.
+
+![Network panels](screenshots/grafana-netio.png)
+
+Three of those hosts had been pulling ~60 Mb/s each the whole
+time, invisibly.
+
+`AF_NETLINK` added to both units. The collectors that still fail —
+`bcachefs`, `infiniband`, `nvme`, `zfs` — are hardware that is
+genuinely absent, and that ordinary noise in the log is exactly
+why this one was easy to walk past.
+
 ## Geo-IP chains must collect per field
 
 My first version took the first non-empty response and stopped.
@@ -487,6 +533,12 @@ which follows along by itself.
   unencrypted on that hop.
 - Retention on the ephemeral instance is 7 days, which is too
   short to track monthly transfer quota.
+- The container-free variant of the push agent — node_exporter and
+  a `prometheus --agent` under systemd, for hosts with no runtime
+  at all — is running but not in this repo yet.
+- Legends on the wider timeseries panels are cut off: four hosts
+  times two directions is eight rows in a panel sized for three.
+  Visible in the screenshots above.
 
 ---
 
